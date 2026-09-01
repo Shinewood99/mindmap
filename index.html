@@ -30,38 +30,50 @@
             display: none; overflow-y: auto; padding: 100px 20% 60px; background: #ffffff;
         }
 
-        /* D3 视觉节点样式 */
-        .link { fill: none; stroke: #94a3b8; stroke-width: 2px; stroke-dasharray: 0; }
-        .node { cursor: pointer; }
+        /* D3 连线 */
+        .link { fill: none; stroke: #94a3b8; stroke-width: 2px; }
         
-        /* 节点卡片样式 */
-        .node rect {
-            fill: #ffffff;
-            stroke: #cbd5e1;
-            stroke-width: 1.5px;
-            rx: 8px; ry: 8px;
-            filter: drop-shadow(0px 4px 6px rgba(15, 23, 42, 0.06));
+        /* HTML 自适应节点卡片样式 */
+        .node-card {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            font-size: 14px;
+            font-weight: 500;
+            color: #334155;
+            cursor: pointer;
             transition: all 0.2s ease;
         }
-        .node:hover rect {
-            stroke: #2563eb;
-            stroke-width: 2px;
-            filter: drop-shadow(0px 6px 12px rgba(37, 99, 235, 0.15));
+
+        .node-card:hover {
+            border-color: #2563eb;
+            box-shadow: 0 6px 12px -2px rgba(37, 99, 235, 0.15);
+            transform: translateY(-1px);
         }
 
-        /* 节点层级字号差异化 */
-        .node-depth-0 rect { fill: #1e293b; stroke: #0f172a; }
-        .node-depth-0 text { fill: #ffffff !important; font-size: 18px !important; font-weight: 700 !important; }
+        /* 根节点样式 */
+        .node-depth-0 .node-card {
+            background: #1e293b;
+            color: #ffffff;
+            border-color: #0f172a;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 10px 20px;
+        }
 
-        .node-depth-1 rect { fill: #eff6ff; stroke: #3b82f6; stroke-width: 2px; }
-        .node-depth-1 text { fill: #1e40af !important; font-size: 15px !important; font-weight: 600 !important; }
-
-        .node text {
-            font-size: 14px;
-            fill: #334155;
-            font-weight: 500;
-            dominant-baseline: middle;
-            text-anchor: middle;
+        /* 二级节点样式 */
+        .node-depth-1 .node-card {
+            background: #eff6ff;
+            color: #1e40af;
+            border-color: #3b82f6;
+            font-size: 15px;
+            font-weight: 600;
         }
 
         /* 幕布大纲样式 */
@@ -148,29 +160,29 @@ const root = d3.hierarchy(data);
 function renderTree() {
     g.selectAll("*").remove();
 
-    // 扩大间隔布局
+    // 节点与连线间距设置
     const treeLayout = d3.tree()
-        .nodeSize(currentLayout === 'vertical' ? [180, 120] : [70, 220]);
+        .nodeSize(currentLayout === 'vertical' ? [200, 130] : [70, 240]);
 
     treeLayout(root);
 
-    // 设置初始偏移居中位置
+    // 初始位置居中调整
     const initialTransform = currentLayout === 'vertical' 
         ? `translate(${width / 2}, 100)` 
         : `translate(150, ${height / 2 - 100})`;
     g.attr("transform", initialTransform);
 
-    // 绘制线段
+    // 绘制连线
     g.selectAll(".link")
         .data(root.links())
         .enter().append("path")
         .attr("class", "link")
-        .attr("d", d3.linkVertical()
-            .x(d => currentLayout === 'vertical' ? d.x : d.y)
-            .y(d => currentLayout === 'vertical' ? d.y : d.x)
+        .attr("d", currentLayout === 'vertical' 
+            ? d3.linkVertical().x(d => d.x).y(d => d.y)
+            : d3.linkHorizontal().x(d => d.y).y(d => d.x)
         );
 
-    // 绘制节点
+    // 绘制节点组
     const node = g.selectAll(".node")
         .data(root.descendants())
         .enter().append("g")
@@ -179,19 +191,23 @@ function renderTree() {
             ? `translate(${d.x},${d.y})` 
             : `translate(${d.y},${d.x})`);
 
-    // 节点背景卡片（根据文字长度动态算宽度）
-    node.append("rect")
-        .attr("x", d => -(d.data.name.length * 9 + 20) / 2)
-        .attr("y", -18)
-        .attr("width", d => d.data.name.length * 18 + 24)
-        .attr("height", 36);
+    // 使用 foreignObject 嵌入 HTML Div 节点实现完美自适应居中
+    const fo = node.append("foreignObject")
+        .attr("width", 260)
+        .attr("height", 60)
+        .attr("x", -130)
+        .attr("y", -25);
 
-    // 节点文字
-    node.append("text")
-        .text(d => d.data.name);
+    fo.append("xhtml:div")
+        .style("display", "flex")
+        .style("justify-content", "center")
+        .style("align-items", "center")
+        .style("width", "100%")
+        .style("height", "100%")
+        .html(d => `<div class="node-card">${d.data.name}</div>`);
 }
 
-// 幕布渲染
+// 幕布渲染逻辑
 function renderOutliner(node, targetEl) {
     const ul = document.createElement('ul');
     node.children?.forEach(item => {
@@ -229,7 +245,7 @@ function showImg(src) {
     document.getElementById('lightbox').style.display = 'flex';
 }
 
-// 初始化渲染
+// 初始化
 renderTree();
 const outlineRoot = document.getElementById('outline-tree');
 outlineRoot.innerHTML = `<h2>${data.name}</h2>`;
