@@ -31,7 +31,7 @@
         }
 
         /* D3 连线 */
-        .link { fill: none; stroke: #94a3b8; stroke-width: 2px; }
+        .link { fill: none; stroke: #94a3b8; stroke-width: 2.5px; }
         
         /* HTML 自适应节点卡片样式 */
         .node-card {
@@ -39,13 +39,13 @@
             align-items: center;
             justify-content: center;
             white-space: nowrap;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
             background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            font-size: 14px;
-            font-weight: 500;
+            border: 2px solid #cbd5e1;
+            box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.08);
+            font-size: 15px;
+            font-weight: 600;
             color: #334155;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -53,8 +53,8 @@
 
         .node-card:hover {
             border-color: #2563eb;
-            box-shadow: 0 6px 12px -2px rgba(37, 99, 235, 0.15);
-            transform: translateY(-1px);
+            box-shadow: 0 8px 16px -2px rgba(37, 99, 235, 0.2);
+            transform: translateY(-2px);
         }
 
         /* 根节点样式 */
@@ -62,9 +62,9 @@
             background: #1e293b;
             color: #ffffff;
             border-color: #0f172a;
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 700;
-            padding: 10px 20px;
+            padding: 12px 24px;
         }
 
         /* 二级节点样式 */
@@ -72,8 +72,9 @@
             background: #eff6ff;
             color: #1e40af;
             border-color: #3b82f6;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 600;
+            padding: 10px 22px;
         }
 
         /* 幕布大纲样式 */
@@ -85,7 +86,7 @@
         .outline-desc { font-size: 14px; color: #64748b; font-weight: normal; margin-left: 20px; display: block; margin-top: 2px; }
         .outline-img { max-width: 260px; border-radius: 8px; margin: 8px 0 8px 20px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
 
-        /* 图片 Preview Lightbox */
+        /* Lightbox */
         .lightbox { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 200; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
         .lightbox img { max-width: 90%; max-height: 90%; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
     </style>
@@ -151,26 +152,23 @@ const height = window.innerHeight;
 const svg = d3.select("#svg").attr("width", width).attr("height", height);
 const g = svg.append("g");
 
-// 拖拽缩放
-const zoom = d3.zoom().scaleExtent([0.5, 2]).on("zoom", (e) => g.attr("transform", e.transform));
-svg.call(zoom);
+// 拖拽缩放行为
+const zoomBehavior = d3.zoom()
+    .scaleExtent([0.3, 3])
+    .on("zoom", (e) => g.attr("transform", e.transform));
+
+svg.call(zoomBehavior);
 
 const root = d3.hierarchy(data);
 
 function renderTree() {
     g.selectAll("*").remove();
 
-    // 节点与连线间距设置
+    // 节点布局及间距设定
     const treeLayout = d3.tree()
-        .nodeSize(currentLayout === 'vertical' ? [200, 130] : [70, 240]);
+        .nodeSize(currentLayout === 'vertical' ? [280, 160] : [90, 300]);
 
     treeLayout(root);
-
-    // 初始位置居中调整
-    const initialTransform = currentLayout === 'vertical' 
-        ? `translate(${width / 2}, 100)` 
-        : `translate(150, ${height / 2 - 100})`;
-    g.attr("transform", initialTransform);
 
     // 绘制连线
     g.selectAll(".link")
@@ -182,7 +180,7 @@ function renderTree() {
             : d3.linkHorizontal().x(d => d.y).y(d => d.x)
         );
 
-    // 绘制节点组
+    // 绘制节点
     const node = g.selectAll(".node")
         .data(root.descendants())
         .enter().append("g")
@@ -191,12 +189,11 @@ function renderTree() {
             ? `translate(${d.x},${d.y})` 
             : `translate(${d.y},${d.x})`);
 
-    // 使用 foreignObject 嵌入 HTML Div 节点实现完美自适应居中
     const fo = node.append("foreignObject")
-        .attr("width", 260)
-        .attr("height", 60)
-        .attr("x", -130)
-        .attr("y", -25);
+        .attr("width", 280)
+        .attr("height", 70)
+        .attr("x", -140)
+        .attr("y", -28);
 
     fo.append("xhtml:div")
         .style("display", "flex")
@@ -205,6 +202,31 @@ function renderTree() {
         .style("width", "100%")
         .style("height", "100%")
         .html(d => `<div class="node-card">${d.data.name}</div>`);
+
+    // 自动自适应居中并放大充满窗口 (Fit View)
+    setTimeout(fitView, 50);
+}
+
+function fitView() {
+    const bbox = g.node().getBBox();
+    if (bbox.width === 0 || bbox.height === 0) return;
+
+    const fullWidth = window.innerWidth;
+    const fullHeight = window.innerHeight;
+
+    const width = bbox.width;
+    const height = bbox.height;
+    const midX = bbox.x + width / 2;
+    const midY = bbox.y + height / 2;
+
+    // 预留 padding 比例
+    const scale = Math.min(fullWidth / (width + 160), fullHeight / (height + 160)) * 0.9;
+    const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+
+    svg.transition().duration(500).call(
+        zoomBehavior.transform,
+        d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+    );
 }
 
 // 幕布渲染逻辑
@@ -231,6 +253,8 @@ function switchView(mode) {
     document.getElementById('mindmap-container').style.display = mode === 'mindmap' ? 'block' : 'none';
     document.getElementById('outliner-container').style.display = mode === 'outliner' ? 'block' : 'none';
     document.getElementById('dir-group').style.display = mode === 'mindmap' ? 'flex' : 'none';
+
+    if (mode === 'mindmap') setTimeout(fitView, 50);
 }
 
 function switchDirection(dir) {
@@ -244,6 +268,11 @@ function showImg(src) {
     document.getElementById('lightbox-img').src = src;
     document.getElementById('lightbox').style.display = 'flex';
 }
+
+window.addEventListener('resize', () => {
+    svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+    fitView();
+});
 
 // 初始化
 renderTree();
